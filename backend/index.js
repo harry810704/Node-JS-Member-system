@@ -3,7 +3,7 @@ const bodyParser = require('body-parser');
 const cookieParser = require('cookie-parser');
 const credentials = require('./middleware/credentials');
 const corsOptions = require('./config/corsOption');
-const verifyJWT = require('./middleware/verify.JWT');
+const verifyJWT = require('./middleware/verifyJWT');
 var cors = require('cors');
 
 const app = express();
@@ -11,7 +11,7 @@ const port = 3000;
 
 // routes(router);
 
-app.use(credentials)
+// app.use(credentials);
 
 app.use(cors(corsOptions));
 
@@ -32,6 +32,7 @@ app.use('/refresh', require('./routes/refresh'));
 app.use(verifyJWT);
 app.use('/user', require('./routes/users'));
 app.use('/todo', require('./routes/todo'));
+app.use('/auth', require('./routes/api/authorizeUsers'));
 
 app.listen(port)
 console.log(`Server is listening to port ${port}`);

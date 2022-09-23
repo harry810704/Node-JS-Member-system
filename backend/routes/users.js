@@ -6,7 +6,7 @@ const userController = require('../controllers/user.js');
 router.get('/', userController.get);
 router.put('/', userController.update);
 // need to add authentication for deleting an account
-// router.delete('/', userController.delete);
+router.delete('/', userController.delete);
 router.get('/logout', userController.logout);
 
 module.exports = router

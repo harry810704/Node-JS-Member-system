@@ -15,9 +15,15 @@ const handleRefreshtoken = (req, res) => {
         rToken,
         process.env.REFRESH_TOKEN,
         (err, decoded) => {
-          if (err || !(data[0].email == decoded.email) ) return res.sendStatus(403);
+          if (err || !(data[0].email == decoded.userInfo.email) ) return res.sendStatus(403);
+          const roles = Object.values(data[0].roles);
           const accessToken = jwt.sign(
-            {"username": decoded.email},
+            {
+              "userInfo": {
+                "username": decoded.userInfo.email,
+                "roles": roles
+              },
+            },
             process.env.ACCESS_TOKEN,
             {expiresIn: process.env.ACCESS_EXPIRED_TIME}
           )

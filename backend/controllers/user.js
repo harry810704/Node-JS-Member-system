@@ -5,16 +5,20 @@ const jwt = require('jsonwebtoken');
 
 const userController = {
   get: (req, res) => {
-    const {email} = req.query.email;
+    const {email} = req.body;
     userModel.get(email, (err, result) => {
       if (err) console.log(err);
       if (result.length > 0) {
-        const data = {
-          id: result[0].user_id,
-          name: result[0].user_name,
-          email: result[0].email,
-          enroll_at: result[0].EnrollAt
-        }
+        const data = []
+        result.map(user => {
+          data.push({
+            id: user.user_id,
+            name: user.user_name,
+            email: user.email,
+            roles: Object.values(JSON.parse(user.roles)),
+            enroll_at: user.EnrollAt
+          })
+        })
         res.status(200).json(data);
       }
       else {
@@ -23,115 +27,94 @@ const userController = {
       }
     })
   },
-  add: (data, res) => {
-    // data = {
-    //   username: '',
-    //   email: '',
-    //   password: 'hashpwd'
-    // }
-    userModel.add(data, (err, result) => {
-      if (err) console.log(err);
-      if (result.insertId) console.log(`User is added! ID: ${result.insertId}`);
-      else console.log(result)
-    })
-  },
-  delete: (req, res) => {
-    const user_id = req.query.user_id;
-    userModel.delete(user_id, (err, result) => {
-      if (err) console.log(err);
-      if (result.deleteId) console.log(`User is deleted! ID: ${result.deleteId}`);
-      else console.log(result)
-    })
-  },
-  update: (req, res) => {
-    // data = {
-    //   username: '',
-    //   email: '',
-    //   password: 'hashpwd'
-    // }
-    const data = req.query;
-    userModel.update(data, (err, result) => {
-      if (err) console.log(err);
-      if (result.updateId) console.log(`User info is updated! ID: ${result.updateId}`);
-      else console.log(result)
-    })
-  },
   register: (req, res) => {
     const saltRounds = 10;
     const {username, email, password} = req.body;
     // need to do input check for sql injection
-    if (!email) {
-      console.log('email is required!');
-      res.status(500).send('email is required!');
+    if (!username || !email || !password) {
+      console.log('username, email and password is required!');
+      return res.status(500).json({'error': 'username, email and password is required!'});
     }
-    if (password) {
-      bcrypt.hash(password, saltRounds, (err, hash) => {
-        if (err) {
-          console.log(`hash error: ${err}`);
-          res.status(500).send(`hash error: ${err}`);
+    bcrypt.hash(password, saltRounds, (err, hash) => {
+      if (err) {
+        return res.status(500).json({'error': `hash error: ${err}`});
+      }
+      const data = {
+        username: username,
+        email: email,
+        password: hash,
+        roles: {
+          User: 2001
         }
-        const accessToken = jwt.sign(
-          { "email": data[0].email },
-          process.env.ACCESS_TOKEN,
-          { expiresIn: process.env.ACCESS_EXPIRED_TIME }
-        )
-        const refreshToken = jwt.sign(
-          { "email": data[0].email },
-          process.env.REFRESH_TOKEN,
-          { expiresIn: process.env.REFRESH_EXPIRED_TIME }
-        )
-        const data = {
-          username: username,
-          email: email,
-          password: hash,
-          refreshToken: refreshToken,
-        }
-        userController.add(data, res);
-        res.cookie('jwt', refreshToken, { httpOnly: true, sameSite: 'None', secure: true, maxAge: 24 * 60 * 60 * 1000 })
-        res.status(200).json({ accessToken });
-      })
-    }
+      }
+      userModel.add(data, (err, result) => {
+        if (err) return res.status(500).json({'error': err});
+        res.sendStatus(200);
+      });
+    })
   },
-  isAuthenticated (req, res, next) {
-    console.log(req.session);
-    console.log(req.sessionID);
-    if (req.session.isLogin) next()
-    else next('/login')
+  delete: (req, res) => {
+    const {user_id} = req.body;
+    userModel.delete(user_id, (err, result) => {
+      if (err) return res.status(500).json({"error": err});
+      res.status(204).json({'message': 'Account has been deleted'});
+    })
+  },
+  update: (req, res) => {
+    const saltRounds = 10;
+    const {email, password} = req.body;
+    if (!email || !password) return res.status(500).json({"error": "email and password is required"});
+    bcrypt.hash(password, saltRounds, (err, hash) => {
+      if (err) {
+        return res.status(500).json({"error": `hash error: ${err}`});
+      }
+      const data = {
+        email: email,
+        password: hash,
+      }
+      userModel.update(data, (err, result) => {
+        if (err) return res.status(500).json({"error": err});
+      })
+      res.sendStatus(200);
+    })
   },
   login: (req, res) => {
     const {email, password} = req.body;
     if (!email || !password) {
-      res.status(400).json({ 'message': 'User email and password is required field' });
+      res.status(400).json({ 'error': 'User email and password is required field' });
     }
     userModel.get(email, (err, data) => {
-      if (err) console.log(err);
+      if (err) return res.status(500).json({"error": err});
       if (data.length > 0){
-        if (password) {
-          bcrypt.compare(password, data[0].pwd, (err, isSame) => {
-            if (err || !isSame) {
-              res.status(500).json({'message': `Login error: ${err}, ${isSame}`});
-              res.send('500');
-            } else {
-              const accessToken = jwt.sign(
-                { "email": data[0].email },
-                process.env.ACCESS_TOKEN,
-                { expiresIn: process.env.ACCESS_EXPIRED_TIME }
-              )
-              const refreshToken = jwt.sign(
-                { "email": data[0].email },
-                process.env.REFRESH_TOKEN,
-                { expiresIn: process.env.REFRESH_EXPIRED_TIME }
-              )
-              userModel.update_token({
-                id: data[0].user_id,
-                refreshToken: refreshToken
-              })
-              res.cookie('jwt', refreshToken, { httpOnly: true, sameSite: 'None', secure: true, maxAge: 24 * 60 * 60 * 1000 })
-              res.status(200).json({ accessToken })
-              // res.redirect('/todo');
-            }
-          })
-        }
+        console.log(data);
+        const roles = Object.values(data[0].roles);
+        bcrypt.compare(password, data[0].pwd, (err, isSame) => {
+          if (err || !isSame) {
+            return res.status(500).json({"error": `Login error: ${err}, ${isSame}`});
+          } else {
+            const accessToken = jwt.sign(
+              { 
+                "userInfo": {
+                  "email": data[0].email,
+                  "roles": roles
+                }
+              },
+              process.env.ACCESS_TOKEN,
+              { expiresIn: process.env.ACCESS_EXPIRED_TIME }
+            )
+            const refreshToken = jwt.sign(
+              { "email": data[0].email },
+              process.env.REFRESH_TOKEN,
+              { expiresIn: process.env.REFRESH_EXPIRED_TIME }
+            )
+            userModel.update_token({
+              id: data[0].user_id,
+              refreshToken: refreshToken
+            })
+            res.cookie('jwt', refreshToken, { httpOnly: true, sameSite: 'None', secure: true, maxAge: 24 * 60 * 60 * 1000 })
+            res.status(200).json({ accessToken })
+          }
+        })
       } else {
         res.sendStatus(404).json({'message': 'User does not exist!'});
       }
@@ -143,7 +126,7 @@ const userController = {
     const refreshToken = cookies.jwt;
 
     userModel.get_token(refreshToken, (err, data) => {
-      if (err) return res.sendStatus(500);
+      if (err) return res.status(500).json({"error": err});
       if (data.length == 0) {
         res.clearCookie('jwt', { httpOnly: true });
         return res.sendStatus(204);
@@ -151,14 +134,14 @@ const userController = {
       // delete refresh token in db
       const update_data = {
         id: data[0].user_id,
-        refreshToken: ''
+        refreshToken: null
       }
       userModel.update_token(update_data, (err, d) => {
-        if (err) return res.sendStatus(500);
+        if (err) return res.status(500).json({"error": err});
       })
     })
     res.clearCookie('jwt', { httpOnly: true, sameSite: 'None', secure: true });
-    res.sendStatus(204);
+    res.status(204).json({'message': 'Logout succeed'});
   }
 }
 
