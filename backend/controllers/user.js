@@ -86,8 +86,7 @@ const userController = {
     userModel.get(email, (err, data) => {
       if (err) return res.status(500).json({"error": err});
       if (data.length > 0){
-        console.log(data);
-        const roles = Object.values(data[0].roles);
+        const roles = Object.values(JSON.parse(data[0].roles));
         bcrypt.compare(password, data[0].pwd, (err, isSame) => {
           if (err || !isSame) {
             return res.status(500).json({"error": `Login error: ${err}, ${isSame}`});

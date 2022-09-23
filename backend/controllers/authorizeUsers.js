@@ -4,13 +4,14 @@ require('dotenv').config();
 const jwt = require('jsonwebtoken');
 
 const authorizeUsers = {
-  getAllUsers: (req, res) => {
-    userModel.get(null, (err, result) => {
-      if (err) console.log(err);
+  getUsers: (req, res) => {
+    const {email} = req.body
+    userModel.get(email, (err, result) => {
+      if (err) return res.status(500).json({"error": err});
       if (result.length > 0) {
         const data = []
         result.map(user => {
-          data.append({
+          data.push({
             id: user.user_id,
             name: user.user_name,
             email: user.email,
@@ -21,15 +22,14 @@ const authorizeUsers = {
         res.status(200).json(data);
       }
       else {
-        console.log(`User does not exist`);
-        res.sendStatus(401);
+        res.status(401).json({"message": "User does not exist"});
       }
     })
   },
   getUser: (req, res) => {
-    const {email} = req.query;
+    const {email} = req.body;
     userModel.get(email, (err, result) => {
-      if (err) console.log(err);
+      if (err) return res.status(500).json({"error": err});
       if (result.length > 0) {
         const data = {
           id: result[0].user_id,
@@ -41,7 +41,7 @@ const authorizeUsers = {
       }
       else {
         console.log(`User does not exist`);
-        res.sendStatus(401);
+        res.status(401).json({"message": "User does not exist"});
       }
     })
   },
@@ -49,15 +49,13 @@ const authorizeUsers = {
     const saltRounds = 10;
     const {username, email, password} = req.body;
     // need to do input check for sql injection
-    if (!email) {
-      console.log('email is required!');
-      res.status(500).send('email is required!');
+    if (!username || !email || !password) {
+      return res.status(500).json('username, email and password are required!');
     }
     if (password) {
       bcrypt.hash(password, saltRounds, (err, hash) => {
         if (err) {
-          console.log(`hash error: ${err}`);
-          res.status(500).send(`hash error: ${err}`);
+          return res.status(500).json(`hash error: ${err}`);
         }
         const data = {
           username: username,
@@ -68,23 +66,22 @@ const authorizeUsers = {
           },
           refreshToken: refreshToken,
         }
-        userController.add(data, res);
+        userModel.add(data, res);
         res.sendStatus(200);
       })
     }
   },
   deleteUser: (req, res) => {
-    const user_id = req.query.user_id;
+    const {user_id} = req.body;
     userModel.delete(user_id, (err, result) => {
-      if (err) console.log(err);
-      if (result.deleteId) console.log(`User is deleted! ID: ${result.deleteId}`);
-      else console.log(result)
+      if (err) return res.status(500).json({"error": err});
     })
+    return res.sendStatus(200);
   },
   updateUser: (req, res) => {
     const data = req.body;
     userModel.updateAuth(data, (err, result) => {
-      if (err) console.log(err);
+      if (err) return res.status(500).json({"error": err});
       res.sendStatus(200);
     })
   },

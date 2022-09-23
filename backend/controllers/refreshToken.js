@@ -15,12 +15,13 @@ const handleRefreshtoken = (req, res) => {
         rToken,
         process.env.REFRESH_TOKEN,
         (err, decoded) => {
-          if (err || !(data[0].email == decoded.userInfo.email) ) return res.sendStatus(403);
-          const roles = Object.values(data[0].roles);
+          console.log(decoded);
+          if (err || !(data[0].email == decoded.email) ) return res.sendStatus(403);
+          const roles = Object.values(JSON.parse(data[0].roles));
           const accessToken = jwt.sign(
             {
               "userInfo": {
-                "username": decoded.userInfo.email,
+                "email": decoded.email,
                 "roles": roles
               },
             },
